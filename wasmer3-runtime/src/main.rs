@@ -17,51 +17,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's compile the Wasm module.
     let module = Module::new(&store, wasm_bytes)?;
 
-    fn add_one(a: i32) -> i32 {
-        println!("Calling `multiply_native`...");
-        let result = a + 1;
-
-        println!("Result of `multiply_native`: {:?}", result);
-
-        result
+    fn add_one_i32(a: i32) -> i32 {
+        a + 1
     }
-    let multiply_native = Function::new_native(&store, add_one);
+    let add_one_i32_native = Function::new_native(&store, add_one_i32);
 
-    fn add_one_f(a: f32) -> f32 {
+    fn add_one_f32(a: f32) -> f32 {
         a + 1.0
     }
-    let add_one_f_native = Function::new_native(&store, add_one_f);
+    let add_one_f32_native = Function::new_native(&store, add_one_f32);
 
     // Create an empty import object.
     let import_object = imports! {
-        "my_imports" => { "add_one" => multiply_native, "add_one_f" => add_one_f_native }
+        "my_imports" => {
+            "add_one_i32" => add_one_i32_native,
+            "add_one_f32" => add_one_f32_native,
+        }
     };
 
     println!("Instantiating module...");
     // Let's instantiate the Wasm module.
     let instance = Instance::new(&module, &import_object)?;
 
-    let sum = instance.exports.get_function("add")?;
+    let add_three_i32 = instance.exports.get_function("add_three_i32")?;
 
-    println!("Calling `sum` function...");
-    // Let's call the `sum` exported function. The parameters are a
-    // slice of `Value`s. The results are a boxed slice of `Value`s.
-    //let results = sum.call(&store, &[Value::I32(1), Value::I32(2)])?;
-    let results = sum.call(&[Value::I32(1), Value::I32(2)])?;
+    println!("Calling `add_three_i32` function...");
+    let results = add_three_i32.call(&[Value::I32(5)])?;
 
     println!("Results: {:?}", results);
-    assert_eq!(results.to_vec(), vec![Value::I32(5)]);
+    assert_eq!(results.to_vec(), vec![Value::I32(8)]);
 
-    let sum = instance.exports.get_function("add_three")?;
+    let add_three_f32 = instance.exports.get_function("add_three_f32")?;
 
-    println!("Calling `sum` function...");
-    // Let's call the `sum` exported function. The parameters are a
-    // slice of `Value`s. The results are a boxed slice of `Value`s.
-    //let results = sum.call(&store, &[Value::I32(1), Value::I32(2)])?;
-    let results = sum.call(&[Value::F32(5.5)])?;
+    println!("Calling `add_three_f32` function...");
+    let results = add_three_f32.call(&[Value::F32(5.5)])?;
 
     println!("Results: {:?}", results);
-    assert_eq!(results.to_vec(), vec![Value::F32(5.0)]);
+    assert_eq!(results.to_vec(), vec![Value::F32(8.5)]);
 
     Ok(())
 }
