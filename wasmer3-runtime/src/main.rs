@@ -2,7 +2,7 @@ use wasmer::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's declare the Wasm module with the text representation.
-    let wasm_bytes = wat2wasm(
+    let _wasm_bytes = wat2wasm(
         r#"
 (module
 (type $sum_t (func (param i32 i32) (result i32)))
@@ -14,6 +14,11 @@ i32.add)
 "#
         .as_bytes(),
     )?;
+
+    let wasm_bytes = include_bytes!(
+        "../../wasmer2-plugin/target/wasm32-unknown-unknown/debug/wasmer2_plugin.wasm"
+    )
+    .as_ref();
 
     // Use Singlepass compiler with the default settings
     let compiler = Singlepass::default();
@@ -33,7 +38,7 @@ i32.add)
     // Let's instantiate the Wasm module.
     let instance = Instance::new(&module, &import_object)?;
 
-    let sum = instance.exports.get_function("sum")?;
+    let sum = instance.exports.get_function("add")?;
 
     println!("Calling `sum` function...");
     // Let's call the `sum` exported function. The parameters are a
@@ -42,7 +47,7 @@ i32.add)
     let results = sum.call(&[Value::I32(1), Value::I32(2)])?;
 
     println!("Results: {:?}", results);
-    assert_eq!(results.to_vec(), vec![Value::I32(3)]);
+    assert_eq!(results.to_vec(), vec![Value::I32(4)]);
 
     Ok(())
 }
