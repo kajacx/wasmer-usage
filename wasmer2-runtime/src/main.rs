@@ -2,7 +2,7 @@ use wasmer::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wasm_bytes = include_bytes!(
-        "../../wasmer2-plugin/target/wasm32-unknown-unknown/debug/wasmer2_plugin.wasm"
+        "../../wasmer-plugin/target/wasm32-unknown-unknown/debug/wasmer2_plugin.wasm"
     )
     .as_ref();
 

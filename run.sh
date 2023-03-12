@@ -1,10 +1,10 @@
 #!/usr/bin/sh
 
-cd wasmer2-plugin && \
+cd wasmer-plugin && \
 cargo build --target=wasm32-unknown-unknown && \
 cd .. && \
 \
-cd wasmer3-runtime && \
+cd wasmer2-runtime && \
 cargo run && \
 cd .. && \
 \
