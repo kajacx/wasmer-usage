@@ -39,13 +39,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's instantiate the Wasm module.
     let instance = Instance::new(&mut store, &module, &import_object)?;
 
-    let add_three_i32 = instance.exports.get_function("add_three_i32")?;
+    let add_three_i32: TypedFunction<i32, i32> = instance
+        .exports
+        .get_function("add_three_i32")?
+        .typed(&mut store)?;
 
     println!("Calling `add_three_i32` function...");
-    let results = add_three_i32.call(&mut store, &[Value::I32(5)])?;
+    let results = add_three_i32.call(&mut store, 5)?;
 
     println!("Results: {:?}", results);
-    assert_eq!(results.to_vec(), vec![Value::I32(8)]);
+    assert_eq!(results, 8);
 
     let add_three_f32 = instance.exports.get_function("add_three_f32")?;
 
