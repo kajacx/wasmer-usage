@@ -18,18 +18,22 @@ extern "C" {
     fn add_one_f32(arg: f32) -> f32;
 }
 
+#[no_mangle]
 pub fn exported_returns_bool() -> bool {
     unsafe { imported_returns_bool() }
 }
 
+#[no_mangle]
 pub fn exported_returns_u8() -> u8 {
     unsafe { imported_returns_u8() }
 }
 
+#[no_mangle]
 pub fn exported_takes_bool(arg: bool) {
     unsafe { imported_takes_bool(arg) }
 }
 
+#[no_mangle]
 pub fn exported_takes_u8(arg: u8) {
     unsafe { imported_takes_u8(arg) }
 }

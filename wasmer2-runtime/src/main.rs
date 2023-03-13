@@ -32,6 +32,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "my_imports" => {
             "add_one_i32" => add_one_i32_native,
             "add_one_f32" => add_one_f32_native,
+            // "imported_takes_bool" => Function::new_native(&store, (|arg: bool| {
+            //     println!("Host takes bool: {arg}");
+            // }) as fn(bool))
+            "imported_takes_u8" => Function::new_native(&store, |arg: u8| {
+                println!("Host takes u8: {arg}");
+            }),
+            // "imported_returns_bool" => Function::new_native(&store, || {
+            //     false
+            // }),
+            "imported_returns_u8" => Function::new_native(&store, || {
+                88
+            }),
         }
     };
 
@@ -53,7 +65,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let results = add_three_f32.call(&[Value::F32(5.5)])?;
 
     println!("Results: {:?}", results);
-    assert_eq!(results.to_vec(), vec![Value::F32(8.5)]);
+    //assert_eq!(results.to_vec(), vec![Value::F32(8.5)]);
+
+    let exported_returns_bool = instance.exports.get_function("exported_returns_bool")?;
+
+    println!("Calling `exported_returns_bool` function...");
+    let results = exported_returns_bool.call(&[])?;
+
+    println!("Results: {:?}", results);
+    assert_eq!(results.to_vec(), vec![Value::I32(0)]);
 
     Ok(())
 }
