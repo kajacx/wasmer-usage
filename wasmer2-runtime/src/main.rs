@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Host takes u8: {arg}");
             }),
             "imported_returns_bool" => Function::new_native(&store, || {
-                4
+                2
             }),
             "imported_returns_u8" => Function::new_native(&store, || {
                 8
