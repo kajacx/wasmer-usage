@@ -17,3 +17,27 @@ pub fn add_three_f32(left: f32) -> f32 {
 extern "C" {
     fn add_one_f32(arg: f32) -> f32;
 }
+
+pub fn exported_returns_bool() -> bool {
+    unsafe { imported_returns_bool() }
+}
+
+pub fn exported_returns_u8() -> u8 {
+    unsafe { imported_returns_u8() }
+}
+
+pub fn exported_takes_bool(arg: bool) {
+    unsafe { imported_takes_bool(arg) }
+}
+
+pub fn exported_takes_u8(arg: u8) {
+    unsafe { imported_takes_u8(arg) }
+}
+
+#[link(wasm_import_module = "my_imports")]
+extern "C" {
+    fn imported_returns_bool() -> bool;
+    fn imported_returns_u8() -> u8;
+    fn imported_takes_bool(arg: bool);
+    fn imported_takes_u8(arg: u8);
+}
