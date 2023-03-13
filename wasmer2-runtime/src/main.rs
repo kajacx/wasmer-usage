@@ -32,17 +32,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "my_imports" => {
             "add_one_i32" => add_one_i32_native,
             "add_one_f32" => add_one_f32_native,
-            // "imported_takes_bool" => Function::new_native(&store, (|arg: bool| {
-            //     println!("Host takes bool: {arg}");
-            // }) as fn(bool))
+            "imported_takes_bool" => Function::new_native(&store, |arg: u8| {
+                println!("Host takes bool: {arg}");
+            }),
             "imported_takes_u8" => Function::new_native(&store, |arg: u8| {
                 println!("Host takes u8: {arg}");
             }),
-            // "imported_returns_bool" => Function::new_native(&store, || {
-            //     false
-            // }),
+            "imported_returns_bool" => Function::new_native(&store, || {
+                4
+            }),
             "imported_returns_u8" => Function::new_native(&store, || {
-                88
+                8
             }),
         }
     };
