@@ -1,6 +1,9 @@
 use wasmer::*;
 
-struct MyEnv;
+#[derive(Clone, Default)]
+struct MyEnv {
+    pub memory: Option<Memory>,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wasm_bytes = include_bytes!(
@@ -15,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's compile the Wasm module.
     let module = Module::new(&store, wasm_bytes)?;
 
-    let env = FunctionEnv::new(&mut store, MyEnv {});
+    let env = FunctionEnv::new(&mut store, MyEnv { memory: None });
 
     fn add_one_i32(_env: FunctionEnvMut<MyEnv>, a: i32) -> i32 {
         a + 1
@@ -39,6 +42,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's instantiate the Wasm module.
     let instance = Instance::new(&mut store, &module, &import_object)?;
 
+    // let mut env_mut = env.as_mut(&mut store);
+    // env_mut.memory = Some(instance.exports.get_memory("memory").expect("get memory"));
+
     let add_three_i32: TypedFunction<i32, i32> = instance
         .exports
         .get_function("add_three_i32")?
@@ -57,6 +63,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Results: {:?}", results);
     assert_eq!(results.to_vec(), vec![Value::F32(8.5)]);
+
+    let give_string: TypedFunction<u32, u64> = instance
+        .exports
+        .get_typed_function(&mut store, "give_string")?;
+
+    let fatptr = give_string.call(&mut store, 5)?;
+
+    let address = fatptr as u32 as usize;
+    let size = (fatptr >> 32) as usize;
+
+    let memory = instance.exports.get_memory("memory").expect("get memory");
+    let view = memory.view(&store);
+
+    let mut bytes = vec![0u8; size];
+
+    view.read(dbg!(address.try_into().expect("usize to u64")), &mut bytes)
+        .expect("view read");
+
+    let text = String::from_utf8(bytes);
+
+    println!("{:?}, {:?}, {:?}", address, size, text);
 
     Ok(())
 }
