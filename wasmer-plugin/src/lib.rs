@@ -4,16 +4,21 @@ static TEXT: Mutex<String> = Mutex::new(String::new());
 
 #[no_mangle]
 pub fn push_string(text: u64) -> u64 {
-    text
-    // let bytes = import_from_host(text);
-    // let text = String::from_utf8(bytes).unwrap();
+    // text
+    let bytes = import_from_host(text);
+    let text = String::from_utf8(bytes).unwrap();
 
-    // TEXT.lock().unwrap().push_str(&text);
+    TEXT.lock().unwrap().push_str(&text);
 
-    // // FIXME: there is a bug. `export_to_host` takes vec, but that vec might have bigger capacity than size
-    // // Let's see if the test uncovers it
-    // let cloned = TEXT.lock().unwrap().as_bytes().to_owned();
-    // export_to_host(cloned)
+    // FIXME: there is a bug. `export_to_host` takes vec, but that vec might have bigger capacity than size
+    // Let's see if the test uncovers it
+    let cloned = TEXT
+        .lock()
+        .unwrap()
+        .as_bytes()
+        .to_owned()
+        .into_boxed_slice();
+    export_to_host(cloned)
 }
 
 #[no_mangle]
@@ -39,6 +44,9 @@ fn import_from_host(fatptr: u64) -> Vec<u8> {
 
 #[no_mangle]
 pub fn allocate_for_host(size: usize) -> u64 {
+    // let values = Box::new([0u8; 20]);
+    // let x = Box::leak(values);
+    // return x as *mut _ as usize as u64;
     let addr = if size == 0 {
         0
     } else {

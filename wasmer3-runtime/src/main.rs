@@ -83,24 +83,39 @@ fn import_from_plugin_view(view: &MemoryView, fatptr: u64) -> Vec<u8> {
     bytes
 }
 
+// fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, data: &[u8]) -> u64 {
+//     let view = memory.view(store);
+//     let allocate = instance
+//         .exports
+//         .get_typed_function::<u32, u64>(&store, "allocate_for_host")
+//         .unwrap();
+//     let allocate = |size: u32| allocate.call(store, size).unwrap();
+//     export_to_plugin_view(&view, allocate, data)
+// }
+
+// fn export_to_plugin_view(
+//     view: &MemoryView,
+//     mut allocate: impl FnMut(u32) -> u64,
+//     data: &[u8],
+// ) -> u64 {
+//     let fatptr = allocate(data.len() as u32);
+//     println!("Allocated in host: {:?}", from_fatptr(fatptr));
+//     let (addr, _) = from_fatptr(fatptr);
+//     view.write(addr as u64, data).unwrap();
+//     fatptr
+// }
+
 fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, data: &[u8]) -> u64 {
-    let view = memory.view(store);
     let allocate = instance
         .exports
         .get_typed_function::<u32, u64>(&store, "allocate_for_host")
         .unwrap();
-    let allocate = |size: u32| allocate.call(store, size).unwrap();
-    export_to_plugin_view(&view, allocate, data)
-}
+    let mut allocate = |size: u32| allocate.call(store, size).unwrap();
 
-fn export_to_plugin_view(
-    view: &MemoryView,
-    mut allocate: impl FnMut(u32) -> u64,
-    data: &[u8],
-) -> u64 {
     let fatptr = allocate(data.len() as u32);
     println!("Allocated in host: {:?}", from_fatptr(fatptr));
     let (addr, _) = from_fatptr(fatptr);
+    let view = memory.view(store);
     view.write(addr as u64, data).unwrap();
     fatptr
 }
