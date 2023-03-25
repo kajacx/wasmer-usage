@@ -36,7 +36,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // let mut shring_strings = |n: u32| {};
 
-    for i in 0..1000000u32 {
+    for i in 0..10_000_000u32 {
+        if i % 1000 == 0 {
+            println!("{}: {}", i, compare_string.len());
+        }
+
         if compare_string.len() < 1000 {
             grow_strings(memory, &mut store, &instance, &mut compare_string, i);
             continue;
@@ -45,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             shrink_strings(memory, &mut store, &instance, &mut compare_string, i % 100);
             continue;
         }
-        if i % 2 == 0 {
+        if i % 13 < 5 {
             grow_strings(memory, &mut store, &instance, &mut compare_string, i);
         } else {
             shrink_strings(memory, &mut store, &instance, &mut compare_string, i % 100);
@@ -114,33 +118,11 @@ fn import_from_plugin(memory: &Memory, store: &Store, fatptr: u64) -> Vec<u8> {
 
 fn import_from_plugin_view(view: &MemoryView, fatptr: u64) -> Vec<u8> {
     let (addr, len) = from_fatptr(fatptr);
-    println!("addr: {addr}, len: {len}");
+    // println!("addr: {addr}, len: {len}");
     let mut bytes = vec![0; len];
     view.read(addr as u64, &mut bytes[0..len]).unwrap();
     bytes
 }
-
-// fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, data: &[u8]) -> u64 {
-//     let view = memory.view(store);
-//     let allocate = instance
-//         .exports
-//         .get_typed_function::<u32, u64>(&store, "allocate_for_host")
-//         .unwrap();
-//     let allocate = |size: u32| allocate.call(store, size).unwrap();
-//     export_to_plugin_view(&view, allocate, data)
-// }
-
-// fn export_to_plugin_view(
-//     view: &MemoryView,
-//     mut allocate: impl FnMut(u32) -> u64,
-//     data: &[u8],
-// ) -> u64 {
-//     let fatptr = allocate(data.len() as u32);
-//     println!("Allocated in host: {:?}", from_fatptr(fatptr));
-//     let (addr, _) = from_fatptr(fatptr);
-//     view.write(addr as u64, data).unwrap();
-//     fatptr
-// }
 
 fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, data: &[u8]) -> u64 {
     let allocate = instance
@@ -150,7 +132,7 @@ fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, dat
     let mut allocate = |size: u32| allocate.call(store, size).unwrap();
 
     let fatptr = allocate(data.len() as u32);
-    println!("Allocated in host: {:?}", from_fatptr(fatptr));
+    // println!("Allocated in host: {:?}", from_fatptr(fatptr));
     let (addr, _) = from_fatptr(fatptr);
     let view = memory.view(store);
     view.write(addr as u64, data).unwrap();
