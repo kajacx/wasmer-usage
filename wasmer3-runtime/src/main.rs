@@ -6,6 +6,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .as_ref();
 
+    let fp = to_fatptr(420, 20);
+    let (addr, len) = from_fatptr(fp);
+    println!("ADDR: {addr}, LEN: {len}");
+
     // Create the store
     let store = Store::new(Cranelift::default());
 
@@ -33,11 +37,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         compare_string.push_str(&appendings);
         let exported = export_to_plugin(&memory, &mut store, &instance, appendings.as_bytes());
 
+        println!("Passing into plugin: {:?}", from_fatptr(exported));
+
         let push_str = instance
             .exports
             .get_typed_function::<u64, u64>(&store, "push_string")
             .unwrap();
         let ret = push_str.call(&mut store, exported).unwrap();
+
+        println!("Getting from  plugin: {:?}", from_fatptr(ret));
 
         let imported = import_from_plugin(&memory, &store, ret);
         let check = String::from_utf8(imported).unwrap();
@@ -69,6 +77,7 @@ fn import_from_plugin(memory: &Memory, store: &Store, fatptr: u64) -> Vec<u8> {
 
 fn import_from_plugin_view(view: &MemoryView, fatptr: u64) -> Vec<u8> {
     let (addr, len) = from_fatptr(fatptr);
+    println!("addr: {addr}, len: {len}");
     let mut bytes = vec![0; len];
     view.read(addr as u64, &mut bytes[0..len]).unwrap();
     bytes
@@ -90,6 +99,7 @@ fn export_to_plugin_view(
     data: &[u8],
 ) -> u64 {
     let fatptr = allocate(data.len() as u32);
+    println!("Allocated in host: {:?}", from_fatptr(fatptr));
     let (addr, _) = from_fatptr(fatptr);
     view.write(addr as u64, data).unwrap();
     fatptr
@@ -97,10 +107,10 @@ fn export_to_plugin_view(
 
 fn from_fatptr(fatptr: u64) -> (usize, usize) {
     let addr = fatptr as u32 as usize;
-    let len = (fatptr << 32) as usize;
+    let len = (fatptr >> 32) as usize;
     (addr, len)
 }
 
 fn to_fatptr(addr: usize, len: usize) -> u64 {
-    (addr as u64) << 32 | len as u64
+    (addr as u32) as u64 | (len as u64) << 32
 }
