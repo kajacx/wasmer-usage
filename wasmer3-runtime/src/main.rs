@@ -24,24 +24,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's instantiate the Wasm module.
     let instance = Instance::new(&mut store, &module, &import_object)?;
 
+    let memory = instance.exports.get_memory("memory").unwrap();
+
     let mut compare_string = String::new();
 
     let mut grow_strings = |n: u32| {
         let appendings = format!("Growing: {n}, ");
         compare_string.push_str(&appendings);
+        let exported = export_to_plugin(&memory, &mut store, &instance, appendings.as_bytes());
 
-            let exported = 
+        let push_str = instance
+            .exports
+            .get_typed_function::<u64, u64>(&store, "push_string")
+            .unwrap();
+        let ret = push_str.call(&mut store, exported).unwrap();
+
+        let imported = import_from_plugin(&memory, &store, ret);
+        let check = String::from_utf8(imported).unwrap();
+
+        assert_eq!(compare_string, check);
     };
-    let mut shring_strings = |n: u32| {
+    // let mut shring_strings = |n: u32| {};
 
-    };
-
-    for _ in 0..1000u32 {
-        if (compare_string.len() < 100) {
-
-        }
+    for i in 0..1000u32 {
+        // if (compare_string.len() < 100) {}
+        grow_strings(i);
     }
-
 
     Ok(())
 }
@@ -66,17 +74,25 @@ fn import_from_plugin_view(view: &MemoryView, fatptr: u64) -> Vec<u8> {
     bytes
 }
 
-fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, data: &[u8]) {
+fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, data: &[u8]) -> u64 {
     let view = memory.view(store);
-    let allocate = instance.exports.get_typed_function::<u32, u64>(&store, "allocate_for_host").unwrap();
-    let allocate = |size: u32| {allocate.call(store, size).unwrap()};
-    export_to_plugin_view(&view, allocate, data);
+    let allocate = instance
+        .exports
+        .get_typed_function::<u32, u64>(&store, "allocate_for_host")
+        .unwrap();
+    let allocate = |size: u32| allocate.call(store, size).unwrap();
+    export_to_plugin_view(&view, allocate, data)
 }
 
-fn export_to_plugin_view(view: &MemoryView, mut allocate: impl FnMut(u32) -> u64, data: &[u8]) {
+fn export_to_plugin_view(
+    view: &MemoryView,
+    mut allocate: impl FnMut(u32) -> u64,
+    data: &[u8],
+) -> u64 {
     let fatptr = allocate(data.len() as u32);
     let (addr, _) = from_fatptr(fatptr);
     view.write(addr as u64, data).unwrap();
+    fatptr
 }
 
 fn from_fatptr(fatptr: u64) -> (usize, usize) {
