@@ -80,7 +80,7 @@ fn grow_strings(
 
     // println!("Getting from  plugin: {:?}", from_fatptr(ret));
 
-    let imported = import_from_plugin(&memory, &store, ret);
+    let imported = import_from_plugin(instance, memory, store, ret);
     let check = String::from_utf8(imported).unwrap();
 
     let a: &str = compare_string.as_str();
@@ -112,15 +112,24 @@ fn remove_chars(string: &mut String, num: u32) {
     string.replace_range((len - num as usize)..len, "");
 }
 
-fn import_from_plugin(memory: &Memory, store: &Store, fatptr: u64) -> Vec<u8> {
-    import_from_plugin_view(&memory.view(store), fatptr)
-}
-
-fn import_from_plugin_view(view: &MemoryView, fatptr: u64) -> Vec<u8> {
+fn import_from_plugin(
+    instace: &Instance,
+    memory: &Memory,
+    store: &mut Store,
+    fatptr: u64,
+) -> Vec<u8> {
     let (addr, len) = from_fatptr(fatptr);
     // println!("addr: {addr}, len: {len}");
     let mut bytes = vec![0; len];
+    let view = memory.view(store);
     view.read(addr as u64, &mut bytes[0..len]).unwrap();
+
+    let free = instace
+        .exports
+        .get_typed_function::<u64, ()>(store, "free_from_host")
+        .unwrap();
+    free.call(store, fatptr);
+
     bytes
 }
 
