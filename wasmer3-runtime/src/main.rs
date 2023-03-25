@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use wasmer::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,34 +34,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut compare_string = String::new();
 
-    let mut grow_strings = |n: u32| {
-        let appendings = format!("Growing: {n}, ");
-        compare_string.push_str(&appendings);
-        let exported = export_to_plugin(&memory, &mut store, &instance, appendings.as_bytes());
-
-        println!("Passing into plugin: {:?}", from_fatptr(exported));
-
-        let push_str = instance
-            .exports
-            .get_typed_function::<u64, u64>(&store, "push_string")
-            .unwrap();
-        let ret = push_str.call(&mut store, exported).unwrap();
-
-        println!("Getting from  plugin: {:?}", from_fatptr(ret));
-
-        let imported = import_from_plugin(&memory, &store, ret);
-        let check = String::from_utf8(imported).unwrap();
-
-        assert_eq!(compare_string, check);
-    };
     // let mut shring_strings = |n: u32| {};
 
-    for i in 0..1000u32 {
-        // if (compare_string.len() < 100) {}
-        grow_strings(i);
+    for i in 0..1000000u32 {
+        if compare_string.len() < 1000 {
+            grow_strings(memory, &mut store, &instance, &mut compare_string, i);
+            continue;
+        }
+        if compare_string.len() > 1000000 {
+            shrink_strings(memory, &mut store, &instance, &mut compare_string, i % 100);
+            continue;
+        }
+        if i % 2 == 0 {
+            grow_strings(memory, &mut store, &instance, &mut compare_string, i);
+        } else {
+            shrink_strings(memory, &mut store, &instance, &mut compare_string, i % 100);
+        }
     }
 
     Ok(())
+}
+
+fn grow_strings(
+    memory: &Memory,
+    store: &mut Store,
+    instance: &Instance,
+    compare_string: &mut String,
+    n: u32,
+) {
+    let appendings = format!("Growing: {n}, ");
+    compare_string.push_str(&appendings);
+    let exported = export_to_plugin(memory, store, instance, appendings.as_bytes());
+
+    // println!("Passing into plugin: {:?}", from_fatptr(exported));
+
+    let push_str = instance
+        .exports
+        .get_typed_function::<u64, u64>(&store, "push_string")
+        .unwrap();
+    let ret = push_str.call(store, exported).unwrap();
+
+    // println!("Getting from  plugin: {:?}", from_fatptr(ret));
+
+    let imported = import_from_plugin(&memory, &store, ret);
+    let check = String::from_utf8(imported).unwrap();
+
+    let a: &str = compare_string.as_str();
+    let b: &str = check.as_str();
+    assert_eq!(a, b);
+}
+
+fn shrink_strings(
+    memory: &Memory,
+    store: &mut Store,
+    instance: &Instance,
+    compare_string: &mut String,
+    n: u32,
+) {
+    remove_chars(compare_string, n);
+    let rm_chars = instance
+        .exports
+        .get_typed_function::<u32, ()>(&store, "remove_chars")
+        .unwrap();
+    rm_chars.call(store, n).unwrap();
 }
 
 fn push_string(string: &mut String, text: &str) {
