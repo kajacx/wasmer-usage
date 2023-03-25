@@ -2,16 +2,20 @@ use wasmer::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wasm_bytes = include_bytes!(
-        "../../wasmer-plugin/target/wasm32-unknown-unknown/debug/wasmer2_plugin.wasm"
+        "../../wasmer-plugin/target/wasm32-unknown-unknown/debug/wasmer_plugin.wasm"
     )
     .as_ref();
 
     // Create the store
-    let mut store = Store::new(Cranelift::default());
+    let store = Store::new(Cranelift::default());
 
     println!("Compiling module...");
     // Let's compile the Wasm module.
     let module = Module::new(&store, wasm_bytes)?;
+
+    // Create the store
+    // TODO: what the actual fuck?
+    let mut store = Store::new(Cranelift::default());
 
     // Create an empty import object.
     let import_object = imports! {};
@@ -19,36 +23,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Instantiating module...");
     // Let's instantiate the Wasm module.
     let instance = Instance::new(&mut store, &module, &import_object)?;
-    let give_string: TypedFunction<u32, u64> = instance
-        .exports
-        .get_typed_function(&mut store, "give_string")?;
 
-    let fatptr = give_string.call(&mut store, 5)?;
+    let mut compare_string = String::new();
 
-    let address = fatptr & 0xffffffff;
-    let size = (fatptr >> 32) as usize;
+    let mut grow_strings = |n: u32| {
+        let appendings = format!("Growing: {n}, ");
+        compare_string.push_str(&appendings);
 
-    let memory = instance.exports.get_memory("memory").expect("get memory");
-    let view = memory.view(&store);
+            let exported = 
+    };
+    let mut shring_strings = |n: u32| {
 
-    let mut bytes = vec![0u8; size];
+    };
 
-    view.read(address, &mut bytes).expect("view read");
+    for _ in 0..1000u32 {
+        if (compare_string.len() < 100) {
 
-    let text = String::from_utf8(bytes);
+        }
+    }
 
-    println!("{:?}, {:?}, {:?}", address, size, text);
 
     Ok(())
 }
 
-#[no_mangle]
-pub fn push_string(string: &mut String, text: &str) {
+fn push_string(string: &mut String, text: &str) {
     string.push_str(text);
 }
 
-#[no_mangle]
-pub fn remove_chars(string: &mut String, num: u32) {
+fn remove_chars(string: &mut String, num: u32) {
     let len = string.len();
     string.replace_range((len - num as usize)..len, "");
 }
@@ -64,33 +66,17 @@ fn import_from_plugin_view(view: &MemoryView, fatptr: u64) -> Vec<u8> {
     bytes
 }
 
-fn import_from_host(fatptr: u64) -> Vec<u8> {
-    let (addr, len) = from_fatptr(fatptr);
-    // SAFETY: Host is giving us full ownership of these bytes
-    unsafe { Vec::from_raw_parts(addr as *mut u8, len, len) }
+fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, data: &[u8]) {
+    let view = memory.view(store);
+    let allocate = instance.exports.get_typed_function::<u32, u64>(&store, "allocate_for_host").unwrap();
+    let allocate = |size: u32| {allocate.call(store, size).unwrap()};
+    export_to_plugin_view(&view, allocate, data);
 }
 
-#[no_mangle]
-pub fn allocate_for_host(size: usize) -> u64 {
-    let addr = if size == 0 {
-        0
-    } else {
-        let layout = Layout::from_size_align(size, 1).unwrap();
-        // SAFETY: size is not zero
-        let bytes = unsafe { alloc(layout) };
-        bytes as *mut u8 as usize
-    };
-    to_fatptr(addr, size)
-}
-
-#[no_mangle]
-pub fn free_from_host(fatptr: u64) {
-    let (addr, len) = from_fatptr(fatptr);
-    if len != 0 {
-        let layout = Layout::from_size_align(len, 1).unwrap();
-        // SAFETY: size is not zero, and host guarantees to not use these bytes anymore
-        unsafe { dealloc(addr as *mut u8, layout) };
-    };
+fn export_to_plugin_view(view: &MemoryView, mut allocate: impl FnMut(u32) -> u64, data: &[u8]) {
+    let fatptr = allocate(data.len() as u32);
+    let (addr, _) = from_fatptr(fatptr);
+    view.write(addr as u64, data).unwrap();
 }
 
 fn from_fatptr(fatptr: u64) -> (usize, usize) {
