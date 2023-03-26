@@ -1,13 +1,8 @@
 use wasmer::*;
 
-// struct Env<'a, 'b> {
-//     store: &'a mut Store,
-//     memory: Option<&'b Memory>,
-// }
-
 struct Env {
-    memory: Option<&'static Memory>,
     instance: Option<&'static Instance>,
+    store: usize,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,43 +12,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .as_ref();
 
     // Create the store
-    let store = Store::new(Cranelift::default());
+    let mut store = Store::new(Cranelift::default());
 
     println!("Compiling module...");
     // Let's compile the Wasm module.
     let module = Module::new(&store, wasm_bytes)?;
 
-    // Create the store
-    // TODO: what the actual fuck?
-    let mut store = Store::new(Cranelift::default());
-
     let env = FunctionEnv::new(
         &mut store,
         Env {
-            memory: None,
             instance: None,
+            store: 0,
         },
     );
 
     // Create an empty import object.
     let import_object = imports! {
         "my_imports" => {
-            // "transform_string" => Function::new_typed(&mut store, |input: u64| {
-            //     let text = String::from_utf8(import_from_plugin(input));
-            // })
             "transform_string" => Function::new_typed_with_env(&mut store, &env, |envf: FunctionEnvMut<Env>, input: u64| {
-                // TODO: WTF??
-                let mut store = Store::new(Cranelift::default());
-
-                let memory = envf.data().memory.unwrap();
+                let store =unsafe {
+                    &mut * (envf.data().store as *mut Store)
+                };
                 let instance = envf.data().instance.unwrap();
+                let memory = instance.exports.get_memory("memory").unwrap();
 
-                let bytes = import_from_plugin(instance, memory, &mut store, input);
+                let bytes = import_from_plugin(instance, memory, store, input);
                 let text = String::from_utf8(bytes).unwrap();
 
                 let transmuted = transmute_string(text);
 
-                let exported = export_to_plugin(&memory, &mut store, instance, &transmuted.into_bytes());
+                let exported = export_to_plugin(&memory,  store, instance, &transmuted.into_bytes());
                 exported
             })
         }
@@ -65,16 +53,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let memory = instance.exports.get_memory("memory").unwrap();
 
+    let store_address = &store as *const _ as usize;
     let mut env_mut = env.as_mut(&mut store);
-    env_mut.memory = Some(memory);
+    env_mut.store = store_address;
     unsafe {
         env_mut.instance = Some(&*(&instance as *const _));
     }
 
     let mut compare_string = String::new();
 
-    for i in 0..1_000_000u32 {
-        if i % 1000 == 0 {
+    for i in 0..10_000_000u32 {
+        if i % 10_000 == 0 {
             println!("{}: {}", i, compare_string.len());
         }
 
@@ -104,7 +93,8 @@ fn grow_strings(
     n: u32,
 ) {
     let appendings = format!("Growing: {n}, ");
-    compare_string.push_str(&appendings);
+    append_string(compare_string, appendings.clone(), transmute_string);
+
     let exported = export_to_plugin(memory, store, instance, appendings.as_bytes());
 
     let push_str = instance
