@@ -40,6 +40,21 @@ fn import_from_host(fatptr: u64) -> Vec<u8> {
     unsafe { Vec::from_raw_parts(addr as *mut u8, len, len) }
 }
 
+fn append_string(
+    changed_string: &mut String,
+    appended_string: String,
+    mut transmutor: impl FnMut(String) -> String,
+) {
+    let appended_string = appended_string + "appended";
+    let appended_string = transmutor(appended_string);
+    changed_string.push_str(&appended_string);
+}
+
+fn shrink_string(changed_string: &mut String, byte_count: u32) {
+    let len = changed_string.len();
+    changed_string.replace_range((len - byte_count as usize)..len, "");
+}
+
 #[link(wasm_import_module = "my_imports")]
 extern "C" {
     fn transform_string(string: u64) -> u64;
