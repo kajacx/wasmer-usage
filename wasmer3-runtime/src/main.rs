@@ -5,9 +5,9 @@ use wasmer::*;
 //     memory: Option<&'b Memory>,
 // }
 
-struct Env<'b, 'c> {
-    memory: Option<&'b Memory>,
-    instance: Option<&'c Instance>,
+struct Env {
+    memory: Option<&'static Memory>,
+    instance: Option<&'static Instance>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,30 +37,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create an empty import object.
     let import_object = imports! {
-            "my_imports" => {
-                // "transform_string" => Function::new_typed(&mut store, |input: u64| {
-                //     let text = String::from_utf8(import_from_plugin(input));
-                // })
-                "transform_string" => Function::new_typed_with_env(&mut store, &env, |envf: FunctionEnvMut<Env>, input: u64| {
-        let mut store = Store::new(Cranelift::default());
-                    let memory = envf.data().memory.unwrap();
-                    let instance = envf.data().instance.unwrap();
+        "my_imports" => {
+            // "transform_string" => Function::new_typed(&mut store, |input: u64| {
+            //     let text = String::from_utf8(import_from_plugin(input));
+            // })
+            "transform_string" => Function::new_typed_with_env(&mut store, &env, |envf: FunctionEnvMut<Env>, input: u64| {
+                // TODO: WTF??
+                let mut store = Store::new(Cranelift::default());
 
-                    let bytes = import_from_plugin(instance, memory, &mut store, input);
-                    let text = String::from_utf8(bytes).unwrap();
+                let memory = envf.data().memory.unwrap();
+                let instance = envf.data().instance.unwrap();
 
-                    let transmuted = transmute_string(text);
+                let bytes = import_from_plugin(instance, memory, &mut store, input);
+                let text = String::from_utf8(bytes).unwrap();
 
-    let exported = export_to_plugin(&memory, &mut store, instance, &transmuted.into_bytes());
-                })
-            }
-        };
+                let transmuted = transmute_string(text);
+
+                let exported = export_to_plugin(&memory, &mut store, instance, &transmuted.into_bytes());
+                exported
+            })
+        }
+    };
 
     println!("Instantiating module...");
     // Let's instantiate the Wasm module.
     let instance = Instance::new(&mut store, &module, &import_object)?;
 
     let memory = instance.exports.get_memory("memory").unwrap();
+
+    let mut env_mut = env.as_mut(&mut store);
+    env_mut.memory = Some(memory);
+    unsafe {
+        env_mut.instance = Some(&*(&instance as *const _));
+    }
 
     let mut compare_string = String::new();
 
