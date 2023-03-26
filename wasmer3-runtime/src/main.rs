@@ -1,5 +1,15 @@
 use wasmer::*;
 
+// struct Env<'a, 'b> {
+//     store: &'a mut Store,
+//     memory: Option<&'b Memory>,
+// }
+
+struct Env<'b, 'c> {
+    memory: Option<&'b Memory>,
+    instance: Option<&'c Instance>,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wasm_bytes = include_bytes!(
         "../../wasmer-plugin/target/wasm32-unknown-unknown/debug/wasmer_plugin.wasm"
@@ -17,14 +27,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TODO: what the actual fuck?
     let mut store = Store::new(Cranelift::default());
 
+    let env = FunctionEnv::new(
+        &mut store,
+        Env {
+            memory: None,
+            instance: None,
+        },
+    );
+
     // Create an empty import object.
     let import_object = imports! {
-        "my_imports" => {
-            "transform_string" => Function::new_typed(&mut store, |input: u64| {
-                let text = String::from_utf8(import_from_plugin(input));
-            })
-        }
-    };
+            "my_imports" => {
+                // "transform_string" => Function::new_typed(&mut store, |input: u64| {
+                //     let text = String::from_utf8(import_from_plugin(input));
+                // })
+                "transform_string" => Function::new_typed_with_env(&mut store, &env, |envf: FunctionEnvMut<Env>, input: u64| {
+        let mut store = Store::new(Cranelift::default());
+                    let memory = envf.data().memory.unwrap();
+                    let instance = envf.data().instance.unwrap();
+
+                    let bytes = import_from_plugin(instance, memory, &mut store, input);
+                    let text = String::from_utf8(bytes).unwrap();
+
+                    let transmuted = transmute_string(text);
+
+    let exported = export_to_plugin(&memory, &mut store, instance, &transmuted.into_bytes());
+                })
+            }
+        };
 
     println!("Instantiating module...");
     // Let's instantiate the Wasm module.
@@ -123,6 +153,10 @@ fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, dat
     let view = memory.view(store);
     view.write(addr as u64, data).unwrap();
     fatptr
+}
+
+fn transmute_string(text: String) -> String {
+    text + " transmuted in host"
 }
 
 // Common between host and plugin:
