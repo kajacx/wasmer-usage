@@ -8,7 +8,7 @@ pub fn push_string(text: u64) -> u64 {
     let bytes = import_from_host(text);
     let text = String::from_utf8(bytes).unwrap();
 
-    TEXT.lock().unwrap().push_str(&text);
+    append_string(&mut *TEXT.lock().unwrap(), text, transmute_via_host);
 
     let cloned = TEXT
         .lock()
@@ -21,10 +21,7 @@ pub fn push_string(text: u64) -> u64 {
 
 #[no_mangle]
 pub fn remove_chars(num: u32) {
-    let len = TEXT.lock().unwrap().len();
-    TEXT.lock()
-        .unwrap()
-        .replace_range((len - num as usize)..len, "");
+    shrink_string(&mut *TEXT.lock().unwrap(), num)
 }
 
 fn export_to_host(mut data: Box<[u8]>) -> u64 {
@@ -40,19 +37,11 @@ fn import_from_host(fatptr: u64) -> Vec<u8> {
     unsafe { Vec::from_raw_parts(addr as *mut u8, len, len) }
 }
 
-fn append_string(
-    changed_string: &mut String,
-    appended_string: String,
-    mut transmutor: impl FnMut(String) -> String,
-) {
-    let appended_string = appended_string + "appended";
-    let appended_string = transmutor(appended_string);
-    changed_string.push_str(&appended_string);
-}
-
-fn shrink_string(changed_string: &mut String, byte_count: u32) {
-    let len = changed_string.len();
-    changed_string.replace_range((len - byte_count as usize)..len, "");
+fn transmute_via_host(input: String) -> String {
+    let fatptr = export_to_host(input.into_bytes().into_boxed_slice());
+    let transmuted = unsafe { transform_string(fatptr) };
+    let bytes = import_from_host(transmuted);
+    String::from_utf8(bytes).unwrap()
 }
 
 #[link(wasm_import_module = "my_imports")]
@@ -84,6 +73,23 @@ pub fn free_from_host(fatptr: u64) {
         // SAFETY: size is not zero, and host guarantees to not use these bytes anymore
         unsafe { dealloc(addr as *mut u8, layout) };
     };
+}
+
+// Common between host and plugin:
+
+fn append_string(
+    changed_string: &mut String,
+    appended_string: String,
+    mut transmutor: impl FnMut(String) -> String,
+) {
+    let appended_string = appended_string + " appended";
+    let appended_string = transmutor(appended_string);
+    changed_string.push_str(&appended_string);
+}
+
+fn shrink_string(changed_string: &mut String, byte_count: u32) {
+    let len = changed_string.len();
+    changed_string.replace_range((len - byte_count as usize)..len, "");
 }
 
 fn from_fatptr(fatptr: u64) -> (usize, usize) {

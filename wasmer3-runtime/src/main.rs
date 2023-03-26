@@ -148,17 +148,25 @@ fn export_to_plugin(memory: &Memory, store: &mut Store, instance: &Instance, dat
     fatptr
 }
 
+// Common between host and plugin:
+
+fn append_string(
+    changed_string: &mut String,
+    appended_string: String,
+    mut transmutor: impl FnMut(String) -> String,
+) {
+    let appended_string = appended_string + " appended";
+    let appended_string = transmutor(appended_string);
+    changed_string.push_str(&appended_string);
+}
+
+fn shrink_string(changed_string: &mut String, byte_count: u32) {
+    let len = changed_string.len();
+    changed_string.replace_range((len - byte_count as usize)..len, "");
+}
+
 fn from_fatptr(fatptr: u64) -> (usize, usize) {
     let addr = fatptr as u32 as usize;
     let len = (fatptr >> 32) as usize;
     (addr, len)
-}
-
-fn to_fatptr(addr: usize, len: usize) -> u64 {
-    (addr as u32) as u64 | (len as u64) << 32
-}
-
-#[link(wasm_import_module = "my_imports")]
-extern "C" {
-    fn transform_string(string: u64) -> u64;
 }
