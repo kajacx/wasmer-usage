@@ -128,7 +128,7 @@ fn import_from_plugin(
         .exports
         .get_typed_function::<u64, ()>(store, "free_from_host")
         .unwrap();
-    free.call(store, fatptr);
+    free.call(store, fatptr).unwrap();
 
     bytes
 }
@@ -156,4 +156,9 @@ fn from_fatptr(fatptr: u64) -> (usize, usize) {
 
 fn to_fatptr(addr: usize, len: usize) -> u64 {
     (addr as u32) as u64 | (len as u64) << 32
+}
+
+#[link(wasm_import_module = "my_imports")]
+extern "C" {
+    fn transform_string(string: u64) -> u64;
 }

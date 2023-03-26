@@ -10,8 +10,6 @@ pub fn push_string(text: u64) -> u64 {
 
     TEXT.lock().unwrap().push_str(&text);
 
-    // FIXME: there is a bug. `export_to_host` takes vec, but that vec might have bigger capacity than size
-    // Let's see if the test uncovers it
     let cloned = TEXT
         .lock()
         .unwrap()
@@ -40,6 +38,11 @@ fn import_from_host(fatptr: u64) -> Vec<u8> {
     let (addr, len) = from_fatptr(fatptr);
     // SAFETY: Host is giving us full ownership of these bytes
     unsafe { Vec::from_raw_parts(addr as *mut u8, len, len) }
+}
+
+#[link(wasm_import_module = "my_imports")]
+extern "C" {
+    fn transform_string(string: u64) -> u64;
 }
 
 #[no_mangle]
